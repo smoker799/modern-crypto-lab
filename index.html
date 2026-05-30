@@ -59,6 +59,42 @@
             color: #111;
         }
 
+        .posts-list {
+            list-style: none;
+            margin: 40px 0;
+        }
+
+        .post-item {
+            margin-bottom: 48px;
+        }
+
+        .post-title {
+            font-size: 1.4rem;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .post-title a {
+            color: #111;
+            text-decoration: none;
+        }
+
+        .post-title a:hover {
+            text-decoration: underline;
+        }
+
+        .post-date {
+            color: #999;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+        }
+
+        .post-excerpt {
+            color: #444;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
         .site-footer {
             margin-top: 80px;
             padding-top: 30px;
@@ -92,7 +128,26 @@
         </header>
 
         <main>
-            <!-- 空白主体区域，作为纯封面 -->
+            <ul class="posts-list">
+                <li class="post-item">
+                    <h2 class="post-title">
+                        <a href="/post/Break%20repeating-key%20XOR.html">Cryptopals Challenge 6 - Break repeating-key XOR</a>
+                    </h2>
+                    <div class="post-date">May 5, 2026</div>
+                    <div class="post-excerpt">
+                        使用汉明距离破解重复密钥XOR加密，解密Vanilla Ice的经典歌词...
+                    </div>
+                </li>
+                <li class="post-item">
+                    <h2 class="post-title">
+                        <a href="/post/2.%20MTC3%20Cracking%20SHA1-Hashed%20Passwords.html">MT3C Cracking Sha1-Hashed passwords</a>
+                    </h2>
+                    <div class="post-date">May 5, 2026</div>
+                    <div class="post-excerpt">
+                        已知 password 经过 sha1-hash 后的值和键盘输入痕迹，破解密码...
+                    </div>
+                </li>
+            </ul>
         </main>
 
         <footer class="site-footer">
