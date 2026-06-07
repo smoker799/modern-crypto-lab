@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTC3 基于护照MRZ区域推导AES密钥并解密</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.8;
+            color: #222;
+            background-color: #ffffff;
+            max-width: 850px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1 {
+            font-size: 24px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        h2 {
+            font-size: 20px;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 18px;
+            margin-top: 1.5em;
+        }
+        p {
+            margin: 1em 0;
+        }
+        pre {
+            background: #f6f8fa;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: Consolas, Menlo, monospace;
+        }
+        .date {
+            color: #666;
+            margin-bottom: 2em;
+        }
+        a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>MTC3 实验：基于护照MRZ区域推导AES密钥并解密</h1>
+    <p class="date">发布时间：2026-06-07</p>
+
+    <h2>一、实验概述</h2>
+    <p>本实验为 MTC3 密码学挑战，核心目标是利用电子护照 <strong>MRZ（机器可读区域）</strong> 数据，按照标准规则派生 AES 密钥，再使用 AES-CBC 模式解密密文，最终得到明文结果。实验涉及 MRZ 数据提取、SHA-1 哈希运算、奇偶校验位添加、AES 分组密码解密等知识点。</p>
+
+    <h2>二、实验原理与流程</h2>
+    <ol>
+        <li>从完整护照字符串中截取合法 MRZ 关键字段；</li>
+        <li>对 MRZ 数据进行 SHA-1 哈希运算，得到哈希摘要；</li>
+        <li>拼接固定字段后再次进行哈希，生成密钥种子；</li>
+        <li>对哈希结果分段添加奇偶校验位，拼接得到最终 128 位 AES 密钥；</li>
+        <li>使用零向量作为 IV，以 AES-CBC 模式解密 Base64 编码后的密文。</li>
+    </ol>
+
+    <h2>三、完整实现代码</h2>
+    <pre><code>from Crypto.Cipher import AES
+import base64
+from hashlib import sha1
+
+
+def calculate_checksum(numbers, weights):
+    """计算校验和"""
+    return sum(n * w for n, w in zip(numbers, weights)) % 10
+
+
+def sha1_hexdigest(data):
+    """计算SHA-1哈希并返回十六进制字符串"""
+    return sha1(data.encode()).hexdigest()
+
+
+def odd_even_check(hex_string):
+    """对16进制字符串进行奇偶校验"""
+    binary_str = bin(int(hex_string, 16))[2:].zfill(len(hex_string) * 4)
+    checked_str = ''.join(b + '1' if b.count('1') % 2 == 0 else b + '0' for b in
+                          (binary_str[i:i + 7] for i in range(0, len(binary_str), 7)))
+    return hex(int(checked_str, 2))[2:].zfill(16)
+
+
+def add_parity_bits(hex_input):
+    # 将十六进制输入转换为二进制字符串
+    binary_str = bin(int(hex_input, 16))[2:].zfill(8 * ((len(hex_input) * 4 + 7) // 8))
+
+    # 为每个 7 位的数据块添加奇偶校验位
+    parity_bits = [
+        binary_str[i:i + 7] + ('1' if binary_str[i:i + 7].count('1') % 2 == 0 else '0')
+        for i in range(0, len(binary_str), 8)
+    ]
+
+    # 将二进制字符串转换回十六进制并返回
+    return hex(int(''.join(parity_bits), 2))[2:]
+
+
+def generate_key(h_d):
+    """生成AES密钥"""
+    ka = add_parity_bits(h_d[:16])
+    kb = add_parity_bits(h_d[16:32])
+    return ka + kb
+
+
+def decrypt_aes_cbc(ciphertext, key):
+    """AES CBC模式解密，IV为全0"""
+    aes = AES.new(bytes.fromhex(key), AES.MODE_CBC, bytes.fromhex('0' * 32))
+    return aes.decrypt(ciphertext).decode()
+
+
+# 主逻辑
+if __name__ == "__main__":
+    # 护照MRZ原始字符串
+    passport = '12345678<8<<<1110182<1111167<<<<<<<<<<<<<<<4'
+    # 截取MRZ有效数据
+    mrz = passport[:10] + passport[13:20] + passport[21:28]
+    # 第一次SHA1哈希
+    h_mrz = sha1_hexdigest(mrz)
+
+    # 拼接固定字段，生成密钥种子
+    k_seed = h_mrz[:32]
+    d = k_seed + '00000001'
+    h_d = sha1(bytes.fromhex(d)).hexdigest()
+
+    # 生成最终AES密钥
+    key = generate_key(h_d)
+
+    # Base64解码密文并解密
+    cipher_text = base64.b64decode(
+        '9MgYwmuPrjiecPMx61O6zIuy3MtIXQQ0E59T3xB6u0Gyf1gYs2i3K9Jxaa0zj4gTMazJuApwd6+jdyeI5iGHvhQyDHGVlAuYTgJrbFDrfB22Fpil2NfNnWFBTXyf7SDI')
+    result = decrypt_aes_cbc(cipher_text, key)
+    print(result)
+</code></pre>
+
+    <h2>四、代码模块说明</h2>
+    <h3>1. 工具函数</h3>
+    <ul>
+        <li><code>calculate_checksum</code>：通用校验和计算函数，用于MRZ标准校验；</li>
+        <li><code>sha1_hexdigest</code>：对字符串做 SHA-1 哈希，输出十六进制结果；</li>
+        <li><code>add_parity_bits</code>：二进制分块并添加奇偶校验位，符合电子护照密钥派生规范；</li>
+        <li><code>generate_key</code>：将哈希结果分段、添加校验位后拼接，得到标准 AES 密钥。</li>
+    </ul>
+
+    <h3>2. 解密函数</h3>
+    <p><code>decrypt_aes_cbc</code> 实现 AES-CBC 解密，实验规定初始向量 IV 为全 0 十六进制字符串。</p>
+
+    <h3>3. 主流程</h3>
+    <p>首先从原始护照串截取 MRZ 数据，经过两次 SHA-1 哈希、奇偶位处理生成密钥，再对 Base64 密文解码并执行 AES 解密。</p>
+
+    <h2>五、运行结果</h2>
+    <p>程序运行后输出明文：</p>
+    <pre>Herzlichen Glueckwunsch. Sie haben die Nuss geknackt. Das Codewort lautet: Kryptographie!</pre>
+    <p>翻译：恭喜你成功破解挑战，本次验证码为：Kryptographie。</p>
+
+    <h2>六、实验总结</h2>
+    <p>本次实验完整复现了电子护照 MRZ 区域派生 AES 密钥的工业流程，掌握了哈希运算、奇偶校验、AES-CBC 分组密码、Base64 编解码等常用密码学技术，理解了真实场景中密钥派生的设计思路。</p>
+
+    <p><a href="../index.html">← 返回首页</a></p>
+</body>
+</html>
