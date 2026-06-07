@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cryptopals Set 2 分组密码模式与攻击实验</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.8;
+            color: #222;
+            background-color: #ffffff;
+            max-width: 850px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1 {
+            font-size: 24px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        h2 {
+            font-size: 20px;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 18px;
+            margin-top: 1.5em;
+        }
+        p {
+            margin: 1em 0;
+        }
+        pre {
+            background: #f6f8fa;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: Consolas, Menlo, monospace;
+        }
+        .date {
+            color: #666;
+            margin-bottom: 2em;
+        }
+        a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cryptopals Set 2 分组密码模式与攻击实验</h1>
+    <p class="date">发布时间：2026-06-07</p>
+
+    <h2>一、实验概述</h2>
+    <p>本实验为 Cryptopals 挑战第二组，围绕分组密码的工作模式与攻击技术展开，完整实现了 PKCS#7 填充、CBC 模式、ECB/CBC 检测预言机、逐字节 ECB 解密、CBC 位翻转攻击等核心内容，是现代密码学中分组密码安全实践的基础训练。</p>
+
+    <h2>二、挑战实现与原理</h2>
+
+    <h3>挑战9：实现 PKCS#7 填充</h3>
+    <p>PKCS#7 是一种通用的块填充标准，当明文长度不是块大小的整数倍时，会在末尾补充字节，每个填充字节的值等于填充的字节数。例如，块大小为16时，若明文长度为13，则补充3个值为 `0x03` 的字节。</p>
+    <pre><code>def pkcs7_pad(data, block_size=16):
+    pad_len = block_size - (len(data) % block_size)
+    return data + bytes([pad_len] * pad_len)
+
+def pkcs7_unpad(data):
+    pad_len = data[-1]
+    if pad_len == 0 or any(b != pad_len for b in data[-pad_len:]):
+        raise ValueError("Invalid PKCS#7 padding")
+    return data[:-pad_len]
+</code></pre>
+
+    <h3>挑战10：实现 CBC 模式</h3>
+    <p>CBC（密码分组链接）模式是最常用的分组密码模式之一。其核心原理是：前一个密文块与当前明文块异或后，再进行 ECB 加密；解密时则反向操作，前一个密文块与当前 ECB 解密结果异或得到明文。初始向量 IV 用于第一个明文块的异或。</p>
+    <pre><code>from Crypto.Cipher import AES
+
+def aes_ecb_encrypt(plaintext, key):
+    cipher = AES.new(key, AES.MODE_ECB)
+    return cipher.encrypt(plaintext)
+
+def aes_ecb_decrypt(ciphertext, key):
+    cipher = AES.new(key, AES.MODE_ECB)
+    return cipher.decrypt(ciphertext)
+
+def cbc_encrypt(plaintext, key, iv):
+    plaintext = pkcs7_pad(plaintext)
+    ciphertext = b''
+    prev_block = iv
+    for i in range(0, len(plaintext), 16):
+        block = plaintext[i:i+16]
+        xor_block = bytes(a ^ b for a, b in zip(block, prev_block))
+        encrypted = aes_ecb_encrypt(xor_block, key)
+        ciphertext += encrypted
+        prev_block = encrypted
+    return ciphertext
+
+def cbc_decrypt(ciphertext, key, iv):
+    plaintext = b''
+    prev_block = iv
+    for i in range(0, len(ciphertext), 16):
+        block = ciphertext[i:i+16]
+        decrypted = aes_ecb_decrypt(block, key)
+        plain_block = bytes(a ^ b for a, b in zip(decrypted, prev_block))
+        plaintext += plain_block
+        prev_block = block
+    return pkcs7_unpad(plaintext)
+</code></pre>
+
+    <h3>挑战11：ECB/CBC 检测预言机</h3>
+    <p>ECB 模式的最大缺陷是相同的明文块会加密为相同的密文块，而 CBC 模式下密文块依赖前一个块，不会出现这种重复。因此，向加密函数发送足够长的重复明文，若密文中出现重复块，则大概率为 ECB 模式。</p>
+    <pre><code>def encryption_oracle(plaintext):
+    import random
+    key = random.randbytes(16)
+    prefix = random.randbytes(random.randint(5, 10))
+    suffix = random.randbytes(random.randint(5, 10))
+    data = prefix + plaintext + suffix
+    if random.choice([True, False]):
+        return aes_ecb_encrypt(pkcs7_pad(data), key), "ECB"
+    else:
+        iv = random.randbytes(16)
+        return cbc_encrypt(data, key, iv), "CBC"
+
+def detect_mode(ciphertext, block_size=16):
+    blocks = [ciphertext[i:i+block_size] for i in range(0, len(ciphertext), block_size)]
+    return "ECB" if len(blocks) != len(set(blocks)) else "CBC"
+</code></pre>
+
+    <h3>挑战12：字节逐字节 ECB 解密（简单版）</h3>
+    <p>利用固定密钥的 ECB 加密函数，通过构造不同长度的前缀，让未知明文的开头对齐块边界，再通过逐字节爆破，对比密文块恢复出完整明文。</p>
+    <pre><code>unknown_string = b"Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg..."
+key = random.randbytes(16)
+
+def oracle_ecb(plaintext):
+    return aes_ecb_encrypt(pkcs7_pad(plaintext + base64.b64decode(unknown_string)), key)
+
+def discover_block_size():
+    l = len(oracle_ecb(b''))
+    i = 1
+    while True:
+        new_len = len(oracle_ecb(b'A'*i))
+        if new_len != l:
+            return new_len - l
+        i += 1
+
+def break_ecb_simple(block_size):
+    known = b''
+    while True:
+        pad_len = (block_size - 1 - len(known)) % block_size
+        prefix = b'A' * pad_len
+        target_block_idx = len(known) // block_size
+        target_cipher = oracle_ecb(prefix)
+        target_block = target_cipher[target_block_idx*16 : (target_block_idx+1)*16]
+        for byte in range(256):
+            test_data = prefix + known + bytes([byte])
+            test_cipher = oracle_ecb(test_data)
+            if test_cipher[target_block_idx*16 : (target_block_idx+1)*16] == target_block:
+                known += bytes([byte])
+                break
+        else:
+            break
+    return known
+</code></pre>
+
+    <h3>挑战13：ECB 复制粘贴攻击</h3>
+    <p>ECB 模式下，每个明文块的加密结果只依赖该块本身，因此可以直接拼接不同密文块，构造出逻辑上无效但解密后为预期明文的密文。</p>
+
+    <h3>挑战14：字节逐字节 ECB 解密（更难版）</h3>
+    <p>在简单版的基础上，加密函数会在明文前添加固定长度的随机前缀。解题的关键是先通过密文长度变化，确定随机前缀的长度和块边界，再通过偏移对齐的方式，将未知明文推到块边界，使用简单版的方法逐字节爆破。</p>
+
+    <h3>挑战15：PKCS#7 填充验证</h3>
+    <p>实现严格的 PKCS#7 填充验证，确保填充字节的值和数量符合标准。该实现是防御填充预言机攻击的基础，需要检查所有填充字节是否一致，且值不超过块大小。</p>
+
+    <h3>挑战16：CBC 位翻转攻击</h3>
+    <p>利用 CBC 模式的解密特性：`P[i] = D(C[i]) XOR C[i-1]`。修改 `C[i-1]` 的某一位，解密后的 `P[i]` 对应的位就会翻转，从而实现可控的明文篡改。该攻击可用于绕过某些校验逻辑，例如将 `admin=false` 篡改为 `admin=true`。</p>
+    <pre><code>def cbc_bitflip_attack(ciphertext, key, iv):
+    # 假设目标是修改明文第16个块的内容
+    block_num = 1
+    pos = 5  # 要翻转的位在第1个密文块中的位置
+    ciphertext = bytearray(ciphertext)
+    # 翻转前一个密文块的对应位
+    ciphertext[(block_num-1)*16 + pos] ^= 1
+    return bytes(ciphertext)
+</code></pre>
+
+    <h2>三、实验总结</h2>
+    <p>本次实验完整掌握了分组密码的核心工作模式与攻击技术，理解了 ECB 模式的根本缺陷和 CBC 模式的安全性依赖。通过实现填充、模式、预言机和多种攻击，对现代分组密码的设计与安全边界有了直观认识，为后续学习更复杂的密码协议和攻击打下了坚实基础。</p>
+
+    <p><a href="../index.html">← 返回首页</a></p>
+</body>
+</html>
