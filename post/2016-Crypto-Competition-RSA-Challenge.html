@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>2016 全国高校密码数学挑战赛 RSA 破译赛题解析</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 850px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.7;
+            color: #222;
+        }
+        h1, h2, h3 {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.3em;
+            margin-top: 2em;
+        }
+        pre {
+            background: #f6f8fa;
+            padding: 1rem;
+            overflow-x: auto;
+            border-radius: 6px;
+        }
+        code {
+            font-family: Consolas, Monaco, monospace;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 0.6em;
+            text-align: left;
+        }
+        th {
+            background: #f6f8fa;
+        }
+        hr {
+            border: 0;
+            border-top: 1px solid #eee;
+            margin: 2em 0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>2016 全国高校密码数学挑战赛 | RSA 加密体制破译赛题解析</h1>
+<p><em>2026-06-10</em></p>
+
+<p>赛题：赛题三 RSA 加密体制破译<br>
+类型：公钥密码学、RSA 原理、分片填充、大数运算<br>
+实验环境：Python、大数运算库、十六进制/ASCII 转换工具</p>
+
+<hr>
+
+<h2>一、赛题背景与问题描述</h2>
+<p>RSA 是目前应用最广泛的公钥密码体制，其安全性依赖于<strong>大整数素因子分解</strong>的数学困难性。本次赛题针对一款自定义分片+比特填充的 RSA 加密软件进行破译，目标：</p>
+<ol>
+    <li>还原 RSA 全套密钥参数：素数 \(p,q\)、模数 \(N\)、加密指数 \(e\)、解密指数 \(d\)</li>
+    <li>截获密文并逆向还原原始通关明文</li>
+    <li>分析该定制 RSA 方案的安全缺陷</li>
+</ol>
+
+<h3>1.1 标准 RSA 算法流程</h3>
+<p><strong>1）密钥生成</strong></p>
+<ol>
+    <li>选取两个大素数 \(p,q\)，计算模数 \(N = pq\)</li>
+    <li>计算欧拉函数 \(\varphi(N)=(p-1)(q-1)\)</li>
+    <li>选取加密指数 \(e\)，满足 \(\gcd(e,\varphi(N))=1\)</li>
+    <li>求解 \(e\) 模 \(\varphi(N)\) 的逆元 \(d\)，满足 \(ed \equiv 1 \pmod{\varphi(N)}\)</li>
+    <li>公钥 \((e,N)\) 公开，私钥 \((d,p,q)\) 保密</li>
+</ol>
+
+<p><strong>2）加解密公式</strong></p>
+<ul>
+    <li>加密：\(c = m^e \bmod N\)</li>
+    <li>解密：\(m = c^d \bmod N\)</li>
+</ul>
+
+<h3>1.2 赛题自定义加密规则（核心约束）</h3>
+<p>该软件并非原生 RSA，增加了<strong>明文分片 + 512 比特固定填充</strong>规则：</p>
+<ol>
+    <li>模数 \(N\) 为 <strong>1024 比特</strong>，\(p、q\) 为大素数；</li>
+    <li>单次加密最多 8 个 ASCII 字符，超长明文按 <strong>8 字符分片</strong>；</li>
+    <li>512bit 消息填充格式（高位→低位）：
+        <ul>
+            <li>64 比特标志位</li>
+            <li>32 比特通信序号</li>
+            <li>若干补零比特</li>
+            <li><strong>最低 64 比特</strong>：8 个分片字符对应的 ASCII 十六进制数据（真实明文）</li>
+        </ul>
+    </li>
+    <li>传输帧格式：<code>1024bit N | 1024bit e | 1024bit 密文 c</code>，全部采用十六进制存储；</li>
+    <li>加密指数统一使用 \(e=0\text{x}10001\)（65537）。</li>
+</ol>
+
+<hr>
+
+<h2>二、原始实验数据</h2>
+<h3>2.1 完整原始明文</h3>
+<pre><code>This is a test of my RSA system.</code></pre>
+<p>按照规则划分为 <strong>4 个 8 字符分片</strong>：</p>
+<table>
+    <thead>
+        <tr>
+            <th>分片序号</th>
+            <th>分片内容</th>
+            <th>64bit ASCII 十六进制</th>
+            <th>通信序号</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>0</td>
+            <td>This is</td>
+            <td>0X5468697320697320</td>
+            <td>00000000</td>
+        </tr>
+        <tr>
+            <td>1</td>
+            <td>a test o</td>
+            <td>0X612074657374206F</td>
+            <td>00000001</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td>f my RSA</td>
+            <td>0X66206D7920525341</td>
+            <td>00000002</td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td> system.</td>
+            <td>0X2073797374656D2E</td>
+            <td>00000003</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>2.2 填充后完整明文（512bit）</h3>
+<p>统一前缀标志位：<code>0xFFFFFFFFFFFFFFFF</code>，拼接序号、零填充、明文段，示例第一条：</p>
+<pre><code>0xFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005468697320697320</code></pre>
+
+<h3>2.3 两组 RSA 密钥参数（十六进制）</h3>
+<p><strong>第一组密钥（分片 0、1 使用）</strong></p>
+<pre><code>p: 0XC60C5F1B997ED8A5E340023F33D2E269CFB423A3CF66B46D3F686747403A92B1265CB12B9A4E0135B890254F31A2C3F96A0427B39A36DEFDEEB85C57A80A9641
+q: 0XD684DA331AB6157DA338B6D7B08AB4C1B72C29BB7F9EF445466056DFDBF29809C4D4A2435986A40DE688AFE7CC5A5C519F7C63CB486E44D523B0E1EF21C22199
+N: 0XA5F51EB02EA9C0CC9B96926A08A761FE3E7CDB6E5B348DBEAEC761DBCFCDB15A6C76F8EE08196008AE60E396D7E228C6DAFC3CC1127F16EC87576B89C151F20F99098621FD46872BC92CDA8C915B758E5C0CACB994F55B8705B938126E08589E2502A7B9019C9A62E82392E8449E00CFC7DA17B8CDE92F9516CE9A2009F42DD9
+e: 0X10001
+d: 0X4C5340AAECBB1BB5BE74F09F9D9D45BF4583ECF38334D75FF44834A4809CEC4D57071C9374DC1EC3BF574634B0D30DC7EF1D04E0131EAA2F5C4B8364D6A95676C23F9DADAAB4523A6F5B22EC5904650BF558B3FDF39E3B13EA4771FB1D297DA03C8E1E82F4759B31A9492C56E4D1C690A66ECEC430849A17C027D1A7480F1E01</code></pre>
+
+<p><strong>第二组密钥（分片 2、3 使用）</strong></p>
+<pre><code>p: 0XD502B3D96C648A9393966CDD37188D37576AA221290C861B347ED7A57640993F7ED2D16992B42AA3CA66936D3268DE47EB3A61B1495C982BF54EC0350B907C4F3CA272F9ED04EEB355367DFDA1B89357130A25411DAC4E3B8A1EECC594E0435F0E7298897B54D6C334062C8D8508AC67CEDAECD1A5FCA84BF2EE5D
+q: 0XE00258CB6F
+N: 0XBA645145D9DE58B0FFA6FC4624A2815092D2A2DC405E7A2515F985727D3C52F479A4D04694568CA9B08391BE79BD122808CF6034AB7251088687BFF5916A4F4723FE1372DCF9B069CAB269A9F8F47CB50078D3279B9452C9B3B65A07B49C793783EDB8EB8D8F1A220D9EFED33147483103A2551A96932738255493F13B511953
+e: 0X10001
+d: 0X524EB244F1CE59966C273B91AC40B620CFB55BA2030E871F01147E11844888B6224C5D4DE14551DFDB93C984DAD94A4359643B247ED6CC7DE774A15440D525E26FE9CF4328DBEF2AAA8E402922596F1C23B8F117C018870777434C93B68F1028295DFA6E69FA8E00FFC4EFEF747C348EDBC99C529B7C3B649813647FF90A8261</code></pre>
+
+<h3>2.4 对应密文（十六进制）</h3>
+<pre><code>分片0 密文: 0X9726C82FED1E6CD58DE825528AE5634653C9921CAE02AFF7325F20D6E7085B7C8E3DC78D7518A78A8BC7D07E2E837083324579510851827794AE3D1FB9BAB360B1413A8F171A83804CEA73DFBC1248139BB27EB7D5BAD724AD8B08F51888B90562AF950725ACDD698F817AE62746CEA09479A191A6552B0116830355C68D0F61
+分片1 密文: 0X789018FDB800AD59A54D27A77F280515BB3BFAB1CD75CB0A255A116D4A44849459FD887FF091F87C0B3E6305F019700E4E4CB3646D1DF276DFB87C4F64245F77377508EC6A796236F8ABB125023D3F4B898F55E3342D0A852193AF890990EA82F12FC85917BF132F2A58C449648D6E934B24E80307AB092DB18110D77BBA0F8E
+分片2 密文: 0X534810A0D1B2F6FB257DC3BBDA30AA76157B89038E52D05EE1E5DB06C2D79FAE84892950EF5FD8ADC4F241C3741AD7C97002902C8CA4D96574F28EDCEF3BEF15303335FA8D250102B4EE77E3B405E30F6B81E92403A8881285B65F29668E05B9CD6AC44FC1CD193CF4A5811A2649BE0EDEFBA91FA7143266286C5EC6EE8077D6
+分片3 密文: 0X8805A937DABF25FE760F9F398C7D9D5955EF7468FEC89119F8DD69874FB009AB2C424BD6A8E85401C4CD130B48D0490586DFBD81C8154EDCEFC3AFC4F80338432197EB059AB54CF109B231416FB65E2F9BE4F01D455E25486D8E155A5874E8A910E8C65F73ACD953D316B35A148D5AC5834D86F66AD415EBA38AD3908B32780A</code></pre>
+
+<hr>
+
+<h2>三、破译思路与实验步骤</h2>
+<h3>3.1 整体破译流程</h3>
+<ol>
+    <li>提取帧数据中的 \(N、e、c\)；</li>
+    <li>利用私钥 \(d\) 执行 RSA 解密：\(m = c^d \bmod N\)，得到<strong>完整 512bit 填充明文</strong>；</li>
+    <li>根据填充规则，截取<strong>最低 64 比特</strong>十六进制串；</li>
+    <li>将十六进制转为 ASCII 字符，得到单分片明文；</li>
+    <li>拼接所有分片，还原完整通关密语；</li>
+    <li>反向验证密钥生成、加密流程，核对所有参数。</li>
+</ol>
+
+<h3>3.2 核心操作要点</h3>
+<ol>
+    <li>十六进制字符串与大整数互相转换；</li>
+    <li>Python 原生 <code>pow(a,b,mod)</code> 实现高效大数模幂（RSA 加解密核心）；</li>
+    <li>按比特位截取有效明文段，剥离标志位、通信序号、补零位；</li>
+    <li>验证 \(\gcd(e,\varphi(N))=1\)、模逆元 \(d\) 的正确性。</li>
+</ol>
+
+<hr>
+
+<h2>四、运行结果</h2>
+<ol>
+    <li><strong>分片解密结果</strong>：依次解密 4 组密文，得到 4 段 8 字符分片；</li>
+    <li><strong>拼接后完整明文</strong>：
+<pre><code>This is a test of my RSA system.</code></pre>
+    </li>
+    <li>所有密钥参数、加解密运算均与赛题原始数据完全吻合，破译成功。</li>
+</ol>
+
+<hr>
+
+<h2>五、安全漏洞分析</h2>
+<p>结合本次定制 RSA 方案，总结存在的安全风险：</p>
+<ol>
+    <li><strong>固定填充格式漏洞</strong><br>
+    填充位结构完全固定（64位标志+32位序号+补零），攻击者可直接定位真实明文所在比特段，极易逆向。</li>
+    <li><strong>低加密指数风险</strong><br>
+    \(e=0\text{x}10001\) 为行业常用小指数，虽运算快，但易遭受<strong>低加密指数攻击</strong>。</li>
+    <li><strong>明文分片重复风险</strong><br>
+    软件支持重复发送相同分片，攻击者可利用<strong>重放攻击、明文-密文映射表</strong>进行分析。</li>
+    <li><strong>素数选取不规范</strong><br>
+    第二组密钥中素数 \(q\) 位数远小于 \(p\)，大幅降低大数分解难度，违背 1024bit RSA 安全设计原则。</li>
+</ol>
+<p><em>补充：标准 1024bit RSA 依靠大整数分解保证安全，若无上述实现漏洞，单纯暴力分解模数在现有算力下难以完成。</em></p>
+
+<hr>
+
+<h2>六、实验总结</h2>
+<ol>
+    <li>本次实验完整复现了<strong>分片+自定义填充</strong>的 RSA 加解密全过程，成功破译密文并还原全部密钥与明文。</li>
+    <li>掌握了 RSA 数论基础：欧拉函数、模逆元、大数模幂运算。</li>
+    <li>算法本身安全 ≠ 工程实现安全，上层分片、填充、素数选取、参数配置都会引入致命漏洞。</li>
+    <li>实际密码系统设计，不仅要选用安全算法，更要严格规范参数与协议设计。</li>
+</ol>
+
+</body>
+</html>
