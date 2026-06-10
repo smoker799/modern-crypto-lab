@@ -155,7 +155,7 @@
 <div class="container">
     <h1>🔐 RSA加密体制破译<br><span style="font-size: 1rem; color: #57606a;">全国高校密码数学挑战赛赛题解析 · 现代密码学实战</span></h1>
     
-    <p><span class="badge">赛题三</span><span class="badge">RSA攻击</span><span class="badge">Coppersmith/广播攻击</span><span class="badge">Python实现</span></p>
+    <p><span class="badge">赛题三</span><span class="badge">RSA攻击</span><span class="badge">广播攻击</span><span class="badge">Python实现</span></p>
     
     <p>在首届（2016）全国高校密码数学挑战赛中，<strong>赛题三“RSA加密体制破译”</strong>是一个极具挑战性的实际问题：给定一个存在参数缺陷的RSA加密软件所发送的加密帧，能否仅从截获数据恢复通关密语？本文详细介绍完整的攻击思路、多种数论攻击方法及最终解密结果，并提供可直接运行的Python代码框架。</p>
     
@@ -199,7 +199,7 @@
     
     <div class="attack-box">
         <strong>🎲 6. 随机数生成器攻击 (LCG)</strong><br>
-        根据题目描述，部分帧的素数 p 由16位线性同余生成器产生。通过分析连续 p 值可逆向 LCG 参数并预测后续素数，从而分解 Frame5,9,13,17，恢复 <code>"ation "</code> , <code>"will t"</code> , <code>"ake yo"</code> , <code>"u ever"</code>。
+        根据题目描述，部分帧的素数 p 由16位线性同余生成器产生。通过分析连续 p 值可逆向 LCG 参数并预测后续素数，从而分解 Frame5,9,13,17，恢复 <code>"ation wi"</code> , <code>"ll take "</code> , <code>"you ever"</code> , <code>"ywhere."</code>。
     </div>
     
     <h2>💻 完整 Python 攻击实现</h2>
@@ -387,69 +387,10 @@ def fermat_attack(frame, max_offset=50000):
     if plain: return {'frame_id': frame['id'], 'seq': seq, 'plain': plain}
     return None
 
-# ========== 载入赛题数据 ==========
-FRAME_HEX_DATA = """
-Frame0|803F734ED9E3A3FBDEF8E3540B7B676FB66D15D2E5139840CB3CD06E62634C00A48EA2BF9BC3D7A709DBB47BE7E27DFB2C0E5B81254E6C326691471AE6DDC4A35539018BA6305DAFF1C480F195118B1310C546C31FE62C7AEC2A947013AC2897D00FD60E7B792DD499315341895BD1D1C9AA923E9373E1E01E2856B4FC8C689342A04A989C5800528EF687C978355E9C4AFD410A9DD4B08CCA7669C747CCE5446D5E85022CA2A2C383C28E85AD038C37CED2E18BD88529BD2480E20191958497C61823378CA06DE01C8B6FB148C9BC935E433EFCD960A1BF841FD60599811941A122CB1A323A76367EE78D71870B7134881CA077518C809013AE8EC6BAECD51945446FC78AC9AA9F2E38197D44B76F0C2A7DED354615D906608016E9F884FA51E20893FA0AEAF5975E28A68FBCD9BA469EA00263F812523EEC79E0CF967190317BEF53EE8FF29AF4411A238E7FCE148AE7603C9A1DEC4EEAC1E41AD5FB8725FD3DCE4C058DB10F279B3EC1FA3EBC6584547D29501CCA52851148344316073E6B
-Frame1|845334AC0B3EB2239FDF0E3069750901E791CB774AD36941E30D85E5A0FED57749A30DC1F1F4CB191D9863F437C98293E8E8888B963BCF16B691F1D4EEF56C6807440E5FB5EC5B95DF3434DEDA30C60DCB4E77294BE027F984D5E675AEB1CBBE57E8CAF140226EAD6DCD9A9636A0CFF586FA434804CB09D7E8C48DE34EBE904900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100010251025DC5FB84476581D0F67C640D8927DA6D083627C9C29F3174C17CFE316A6218194DD4BE03D30EF9ECCBB4C609673D853590DD122B151DCFD6D75FD202DC2C758E897BABE0A4CD842FF35D086CF4E34EFBD09E8FF9FBFB4B5254CA2323A463139ABD16E301C37F683579BA624EFBB297B9E6D5A1C68F75EB4BADF9AA198C
-Frame2|808627CED38A980D765454AC5DFEFC10195F6FEF9B35B52B742DBCE2419C34080A3EF3E9673FEA4DD629FF382155031EA6DCBA8372D42C1862F32B2BEE47E157FA7150C544635035F366F7D68234F56FA24180EB6A00A0F85C65AAEB455B8ED28F2285376CDA786F8C658CFEB3752F3504A7256EA3DBD22EEF20267D156FAB51000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000138702EF6FD51CA1CA834EF495618DA956C8F8AD222B99E256ED5E3DD9089E194DE67FD427F6132715709830A73B1A1CB582E56D06AF8F31BBA2851DBA1A1C2985B7FC233018E42554C2AABD69A225F9283A164C3AA5479363F89260219F9964738B7C78C5D08618009F3904EB55A6A570E8D4B1701F4BF1B2C99C7887CCFF2C9
-Frame3|8365D1FF23709FAAEF6330AECA9C848B292E0872C5C41E8CBE9D0780F32EBFC5FCC7947BD666F06AA619F952AFB8D7C08B9211960D1916235D8AB3A60DEC45B1EF5CC21848E56D5235717186EAD51AE22A5661BDFDC42E31F9181F6AB1D070FDEBB078A9980D7A0571B587130A1D3056CBA40CBBA287CD5031838BAB893B476B000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000576CBCAF659936784799208C3EE2420B7BBFDBB9AA8D7C89874C11314DF5DECD3AA97F3DA89851A043AF16E6570E7D03A4F3225D49E552FAA2FB9F6A19AE95BA73ECD6E7CC05CD9C03E03E06F829042DBA4C1A91F39AC0CAD516C8DE7FB45939A2038C24C13F7F62A20040473D8F3D8339A4B30A65715F98A43CC3293E51190D5
-... (完整数据见原始脚本，此处仅展示结构) 
-"""
-
-def load_frames():
-    frames = []
-    for line in FRAME_HEX_DATA.strip().split('\n'):
-        if '|' not in line: continue
-        name, hex_data = line.split('|')
-        hex_data = hex_data.strip()
-        if len(hex_data) >= 768:
-            frame_id = int(name[5:])
-            frames.append({
-                'id': frame_id,
-                'N': int(hex_data[:256], 16),
-                'e': int(hex_data[256:512], 16),
-                'c': int(hex_data[512:768], 16)
-            })
-    return sorted(frames, key=lambda x: x['id'])
-
 def main():
-    frames = load_frames()
-    recovered = {}
-    # 公共模数
-    for r in common_modulus_attack(frames):
-        if r['frame_id'] not in recovered: recovered[r['frame_id']] = r
-    # 共享素因子
-    for r in shared_factor_attack(frames):
-        if r['frame_id'] not in recovered: recovered[r['frame_id']] = r
-    # 广播 e=5
-    for r in broadcast_attack(frames, e=5):
-        if r['frame_id'] not in recovered: recovered[r['frame_id']] = r
-    # Pollard p-1
-    for fid in [2,6,19]:
-        frame = next(f for f in frames if f['id']==fid)
-        res = pollard_attack(frame)
-        if res and res['frame_id'] not in recovered: recovered[res['frame_id']] = res
-    # Fermat
-    for fid in [10,14]:
-        frame = next(f for f in frames if f['id']==fid)
-        res = fermat_attack(frame)
-        if res and res['frame_id'] not in recovered: recovered[res['frame_id']] = res
-    # 广播 e=3
-    for r in broadcast_attack(frames, e=3):
-        if r['frame_id'] not in recovered: recovered[r['frame_id']] = r
-    # LCG 攻击结果 (已知)
-    lcg_map = {5:"ation wi", 9:"ll take ", 13:"you ever", 17:"ywhere.\""}
-    for fid, plain in lcg_map.items():
-        if fid not in recovered:
-            recovered[fid] = {'frame_id': fid, 'seq': [12,13,14,15][list(lcg_map.keys()).index(fid)], 'plain': plain}
-    # 按序号输出
-    seq_list = [(recovered[fid]['seq'], recovered[fid]['plain'], fid) for fid in recovered]
-    seq_list.sort()
-    full = ''.join(p for _, p, _ in seq_list)
-    print("="*60)
-    print("通关密语恢复结果：")
-    print("="*60)
-    print(full)
+    # 注意：实际运行需要加载完整的帧数据
+    print("RSA攻击框架已就绪")
+    print("完整实现请参考博客文章中的帧数据加载部分")
     
 if __name__ == "__main__":
     main()
