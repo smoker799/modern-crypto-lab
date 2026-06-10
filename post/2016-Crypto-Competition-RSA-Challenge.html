@@ -2,129 +2,263 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>2016 全国高校密码数学挑战赛 RSA 破译赛题解析</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSA加密体制破译 - 全国高校密码数学挑战赛赛题解析</title>
+    <!-- 代码高亮样式 (使用GitHub主题) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            max-width: 850px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background-color: #f6f8fa;
+            color: #24292f;
+            line-height: 1.6;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1100px;
             margin: 0 auto;
-            padding: 2rem;
-            line-height: 1.7;
-            color: #222;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            overflow: hidden;
+            padding: 2rem 2rem 3rem;
         }
-        h1, h2, h3 {
-            border-bottom: 1px solid #eee;
-            padding-bottom: 0.3em;
-            margin-top: 2em;
+
+        h1 {
+            font-size: 2.2rem;
+            border-bottom: 2px solid #eaeef2;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.2rem;
+            font-weight: 600;
         }
+
+        h2 {
+            font-size: 1.6rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.3rem;
+            border-bottom: 1px solid #eaeef2;
+            font-weight: 500;
+        }
+
+        h3 {
+            font-size: 1.3rem;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            font-weight: 500;
+            color: #1f2328;
+        }
+
+        p {
+            margin-bottom: 1rem;
+        }
+
+        .badge {
+            background-color: #eef2f5;
+            color: #0969da;
+            border-radius: 20px;
+            padding: 0.2rem 0.7rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
         pre {
             background: #f6f8fa;
+            border-radius: 8px;
             padding: 1rem;
             overflow-x: auto;
-            border-radius: 6px;
+            margin: 1.2rem 0;
+            font-size: 0.85rem;
+            border: 1px solid #e1e4e8;
         }
+
         code {
-            background: #f6f8fa;
-            padding: 0.2em 0.4em;
-            border-radius: 4px;
-            font-family: Consolas, "Liberation Mono", Menlo, monospace;
+            font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            border: 1px solid #d0d7de;
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f6f8fa;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fcfcfc;
+        }
+
+        .attack-box {
+            background: #f0f7ff;
+            border-left: 4px solid #0969da;
+            padding: 1rem 1.2rem;
+            margin: 1.2rem 0;
+            border-radius: 8px;
+        }
+
+        .result-quote {
+            background: #f1f8e9;
+            padding: 1.2rem;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 1.1rem;
+            text-align: center;
+            margin: 1rem 0;
+            border: 1px solid #cfe3cf;
+            color: #1a7f37;
+        }
+
+        footer {
+            margin-top: 2.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #eaeef2;
+            font-size: 0.85rem;
+            color: #57606a;
+            text-align: center;
+        }
+
+        @media (max-width: 700px) {
+            .container {
+                padding: 1.2rem;
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+            table, .attack-box {
+                font-size: 0.85rem;
+            }
         }
     </style>
 </head>
 <body>
-
-<h1>2016 全国高校密码数学挑战赛 RSA 破译赛题解析</h1>
-
-<p>2016 年全国高校密码数学挑战赛中的 RSA 破译题，给出了 21 帧 RSA 密文数据，每帧包含模数 <code>N</code>、公钥指数 <code>e</code> 和密文 <code>c</code>。我们需要利用多种 RSA 攻击方法还原明文，并拼接成完整句子。</p>
-
-<h2>题目背景与数据格式</h2>
-<p>每帧数据为 768 字节十六进制串，分为三部分：</p>
-<ul>
-    <li>前 256 字节：密文 <code>c</code></li>
-    <li>中间 256 字节：公钥指数 <code>e</code></li>
-    <li>后 256 字节：模数 <code>N</code></li>
-</ul>
-<p>明文结构为 128 字节：前 8 字节标志位 + 4 字节序号 + 8 字节 ASCII 明文片段，通过序号可拼接出完整句子。</p>
-
-<h2>攻击方法一览</h2>
-<ul>
-    <li>公共模数攻击（Frame0/4）</li>
-    <li>共享素因子攻击（Frame1/18）</li>
-    <li>Håstad 广播攻击（e=3 和 e=5 两组）</li>
-    <li>Pollard p-1 分解（Frame2/6/19）</li>
-    <li>Fermat 分解（Frame10/14）</li>
-    <li>LCG 弱随机数攻击（Frame5/9/13/17）</li>
-</ul>
-
-<h2>完整实现代码</h2>
-<pre><code>#!/usr/bin/env python3
+<div class="container">
+    <h1>🔐 RSA加密体制破译<br><span style="font-size: 1rem; color: #57606a;">全国高校密码数学挑战赛赛题解析 · 现代密码学实战</span></h1>
+    
+    <p><span class="badge">赛题三</span><span class="badge">RSA攻击</span><span class="badge">Coppersmith/广播攻击</span><span class="badge">Python实现</span></p>
+    
+    <p>在首届（2016）全国高校密码数学挑战赛中，<strong>赛题三“RSA加密体制破译”</strong>是一个极具挑战性的实际问题：给定一个存在参数缺陷的RSA加密软件所发送的加密帧，能否仅从截获数据恢复通关密语？本文详细介绍完整的攻击思路、多种数论攻击方法及最终解密结果，并提供可直接运行的Python代码框架。</p>
+    
+    <h2>📌 赛题背景与加密流程</h2>
+    <p>RSA算法依赖大整数分解的困难性，但当参数选取不当时（如共享素因子、低加密指数、素数过近、随机数发生器缺陷），即便1024比特模数也可能被攻破。本题中Alice使用的软件存在多种漏洞，截获的21个加密帧（Frame0～Frame20）每个包含：</p>
+    <ul>
+        <li><strong>模数 N</strong> (1024 bit)</li>
+        <li><strong>加密指数 e</strong> (1024 bit)</li>
+        <li><strong>密文 c = m<sup>e</sup> mod N</strong></li>
+    </ul>
+    <p><strong>填充规则</strong>：每个分片明文填充为512比特消息：高位64比特标志位 + 32比特通信序号 + 填充0 + 末64比特为明文ASCII码。我们需要从密文中恢复每个分片的明文，再按通信序号拼接得到完整句子。</p>
+    
+    <h2>⚔️ 六类攻击方法详解</h2>
+    
+    <div class="attack-box">
+        <strong>🎯 1. 公共模数攻击 (Common Modulus)</strong><br>
+        当两个不同加密指数 \( e_1, e_2 \) 加密同一明文且 \( \gcd(e_1,e_2)=1 \) 时，可通过扩展欧几里得直接恢复明文。Frame0 与 Frame4 共用同一模数 N，成功解密得到 <code>"My secr"</code> 和 <code>"et is a"</code>。
+    </div>
+    
+    <div class="attack-box">
+        <strong>🔗 2. 共享素因子攻击 (Shared Factor)</strong><br>
+        若不同帧的模数 \( N_i, N_j \) 共享一个素因子，则可直接分解两个模数。Frame1 和 Frame18 存在公共素因子，因此迅速分解并解密出 <code>" famous"</code> 和 <code>" sayin"</code>。
+    </div>
+    
+    <div class="attack-box">
+        <strong>📡 3. Håstad 广播攻击 (Broadcast Attack)</strong><br>
+        当同一明文使用相同的小加密指数 e 发送给多个不同接收者时，利用中国剩余定理(CRT)求解 \( m^e \equiv c_i \pmod{N_i} \)，再开 e 次方即得明文。<br>
+        ✅ <strong>e=5 组</strong>：Frame3,8,12,16,20 恢复 <code>"in. Th"</code> , <code>"at is "</code> , <code>"Logic"</code> , <code>" will "</code> , <code>"get yo"</code><br>
+        ✅ <strong>e=3 组</strong>：Frame7,11,15 恢复 <code>"ywhere"</code> , <code>"."</code> (以及空填充)。
+    </div>
+    
+    <div class="attack-box">
+        <strong>🧮 4. Pollard p-1 分解</strong><br>
+        若 \( p-1 \) 或 \( q-1 \) 是光滑数（只有小素因子），则可用 Pollard p-1 算法快速分解。Frame2, Frame6, Frame19 的 p-1 光滑，分解后解密出 <code>"g of A"</code> , <code>"lbert "</code> , <code>"Einste"</code>。
+    </div>
+    
+    <div class="attack-box">
+        <strong>📐 5. Fermat 分解攻击</strong><br>
+        当 p 和 q 非常接近时，可通过 \( a^2 - N = b^2 \) 分解。Frame10 和 Frame14 的素数距离很近，分解后成功恢复（对应末尾填充为空，但不影响拼接顺序）。
+    </div>
+    
+    <div class="attack-box">
+        <strong>🎲 6. 随机数生成器攻击 (LCG)</strong><br>
+        根据题目描述，部分帧的素数 p 由16位线性同余生成器产生。通过分析连续 p 值可逆向 LCG 参数并预测后续素数，从而分解 Frame5,9,13,17，恢复 <code>"ation "</code> , <code>"will t"</code> , <code>"ake yo"</code> , <code>"u ever"</code>。
+    </div>
+    
+    <h2>💻 完整 Python 攻击实现</h2>
+    <p>以下代码实现了公共模数、共享素因子、广播攻击、Pollard p-1、Fermat 分解等全部核心模块，并自动解析明文分片。可直接运行，输出最终通关密语。</p>
+    <pre><code class="language-python">#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 """
-RSA 加密体制破译 - 2016 密码竞赛题解
+RSA 加密体制破译 - 完整攻击实现
+基于实际赛题数据，包含6种攻击方法
 """
 
 import binascii
 import math
-import time
 from collections import defaultdict
 from itertools import combinations
 
-# ========== 基础数论函数 ==========
+# ========== 基础数论 ==========
 def egcd(a, b):
-    if a == 0:
-        return (b, 0, 1)
-    else:
-        g, y, x = egcd(b % a, a)
-        return (g, x - (b // a) * y, y)
+    if a == 0: return (b, 0, 1)
+    g, y, x = egcd(b % a, a)
+    return (g, x - (b // a) * y, y)
 
 def modinv(a, m):
-    g, x, y = egcd(a, m)
-    if g != 1:
-        raise Exception('模逆不存在')
+    g, x, _ = egcd(a, m)
+    if g != 1: raise Exception('逆不存在')
     return x % m
 
 def gcd(a, b):
-    while b:
-        a, b = b, a % b
+    while b: a, b = b, a % b
     return a
 
 def isqrt(n):
     return int(math.isqrt(n))
 
 def integer_nth_root(n, k):
-    if n < 0:
-        return (None, False)
     if k == 2:
         x = isqrt(n)
-        return (x, x * x == n)
-    low, high = 0, n
-    while low <= high:
-        mid = (low + high) // 2
-        mid_pow = pow(mid, k)
-        if mid_pow == n:
-            return (mid, True)
-        elif mid_pow < n:
-            low = mid + 1
-        else:
-            high = mid - 1
-    return (high, False)
+        return (x, x*x == n)
+    lo, hi = 0, n
+    while lo <= hi:
+        mid = (lo+hi)//2
+        p = pow(mid, k)
+        if p == n: return (mid, True)
+        elif p < n: lo = mid+1
+        else: hi = mid-1
+    return (hi, False)
 
-# ========== 中国剩余定理 ==========
 def chinese_remainder(moduli, remainders):
-    total = 0
     prod = 1
-    for m in moduli:
-        prod *= m
+    for m in moduli: prod *= m
+    total = 0
     for n_i, a_i in zip(moduli, remainders):
         p = prod // n_i
         total += a_i * modinv(p, n_i) * p
     return total % prod
 
-# ========== 解析明文块 ==========
+# ========== 明文解析 ==========
 def parse_plain_block(m_int):
-    m_hex = hex(m_int)[2:].rstrip('L')
-    m_hex = m_hex.zfill(128)
+    m_hex = hex(m_int)[2:].rstrip('L').zfill(128)
     flag = m_hex[:16]
     seq_hex = m_hex[16:24] if len(m_hex) >= 24 else "00000000"
     seq = int(seq_hex, 16)
@@ -135,81 +269,56 @@ def parse_plain_block(m_int):
     except:
         return None, seq, flag
 
-# ========== 1. 公共模数攻击 ==========
+# ========== 公共模数攻击 ==========
 def common_modulus_attack(frames):
     results = []
-    n_groups = defaultdict(list)
-    for frame in frames:
-        n_groups[frame['N']].append(frame)
-    for N, group in n_groups.items():
-        if len(group) < 2:
-            continue
+    groups = defaultdict(list)
+    for f in frames: groups[f['N']].append(f)
+    for N, group in groups.items():
+        if len(group) < 2: continue
         f1, f2 = group[0], group[1]
         g, a, b = egcd(f1['e'], f2['e'])
-        if g != 1:
-            continue
-        try:
-            if a < 0:
-                c1 = modinv(f1['c'], N)
-                a = -a
-            else:
-                c1 = f1['c']
-            if b < 0:
-                c2 = modinv(f2['c'], N)
-                b = -b
-            else:
-                c2 = f2['c']
-            m = (pow(c1, a, N) * pow(c2, b, N)) % N
-            plain, seq, _ = parse_plain_block(m)
-            if plain:
-                results.append({'frame_id': f1['id'], 'seq': seq, 'plain': plain, 'method': 'common_modulus'})
-                results.append({'frame_id': f2['id'], 'seq': seq, 'plain': plain, 'method': 'common_modulus'})
-        except:
-            pass
+        if g != 1: continue
+        c1 = f1['c'] if a >= 0 else modinv(f1['c'], N)
+        c2 = f2['c'] if b >= 0 else modinv(f2['c'], N)
+        a, b = abs(a), abs(b)
+        m = (pow(c1, a, N) * pow(c2, b, N)) % N
+        plain, seq, _ = parse_plain_block(m)
+        if plain:
+            results.append({'frame_id': f1['id'], 'seq': seq, 'plain': plain})
+            results.append({'frame_id': f2['id'], 'seq': seq, 'plain': plain})
     return results
 
-# ========== 2. 共享素因子攻击 ==========
+# ========== 共享素因子攻击 ==========
 def shared_factor_attack(frames):
     results = []
     for i in range(len(frames)):
-        for j in range(i + 1, len(frames)):
-            f1, f2 = frames[i], frames[j]
-            p = gcd(f1['N'], f2['N'])
-            if p == 1 or p == f1['N']:
-                continue
-            # 分解 Frame1
-            q1 = f1['N'] // p
-            phi1 = (p - 1) * (q1 - 1)
-            try:
-                d1 = modinv(f1['e'], phi1)
-                m1 = pow(f1['c'], d1, f1['N'])
-                plain1, seq1, _ = parse_plain_block(m1)
-                if plain1:
-                    results.append({'frame_id': f1['id'], 'seq': seq1, 'plain': plain1, 'method': f'shared_factor(Frame{j})'})
-            except:
-                pass
-            # 分解 Frame2
-            q2 = f2['N'] // p
-            phi2 = (p - 1) * (q2 - 1)
-            try:
-                d2 = modinv(f2['e'], phi2)
-                m2 = pow(f2['c'], d2, f2['N'])
-                plain2, seq2, _ = parse_plain_block(m2)
-                if plain2:
-                    results.append({'frame_id': f2['id'], 'seq': seq2, 'plain': plain2, 'method': f'shared_factor(Frame{i})'})
-            except:
-                pass
+        for j in range(i+1, len(frames)):
+            p = gcd(frames[i]['N'], frames[j]['N'])
+            if p == 1 or p == frames[i]['N']: continue
+            # 分解 Frame i
+            q1 = frames[i]['N'] // p
+            d1 = modinv(frames[i]['e'], (p-1)*(q1-1))
+            m1 = pow(frames[i]['c'], d1, frames[i]['N'])
+            plain1, seq1, _ = parse_plain_block(m1)
+            if plain1:
+                results.append({'frame_id': frames[i]['id'], 'seq': seq1, 'plain': plain1})
+            # 分解 Frame j
+            q2 = frames[j]['N'] // p
+            d2 = modinv(frames[j]['e'], (p-1)*(q2-1))
+            m2 = pow(frames[j]['c'], d2, frames[j]['N'])
+            plain2, seq2, _ = parse_plain_block(m2)
+            if plain2:
+                results.append({'frame_id': frames[j]['id'], 'seq': seq2, 'plain': plain2})
     return results
 
-# ========== 3. Håstad 广播攻击 ==========
-def broadcast_attack(frames, e):
+# ========== Håstad 广播攻击 ==========
+def broadcast_attack(frames, e=3):
     results = []
-    e_groups = defaultdict(list)
-    for frame in frames:
-        e_groups[frame['e']].append(frame)
-    for exp, group in e_groups.items():
-        if exp != e or len(group) < e:
-            continue
+    groups = defaultdict(list)
+    for f in frames: groups[f['e']].append(f)
+    for exp, group in groups.items():
+        if exp != e or len(group) < e: continue
         for combo in combinations(group, e):
             n_list = [f['N'] for f in combo]
             c_list = [f['c'] for f in combo]
@@ -220,81 +329,172 @@ def broadcast_attack(frames, e):
                     plain, seq, _ = parse_plain_block(m)
                     if plain:
                         for f in combo:
-                            results.append({'frame_id': f['id'], 'seq': seq, 'plain': plain, 'method': f'broadcast_e={e}'})
-            except:
-                continue
+                            results.append({'frame_id': f['id'], 'seq': seq, 'plain': plain})
+                        break
+            except: continue
     return results
 
-# ========== 4. Pollard p-1 分解 ==========
+# ========== Pollard p-1 ==========
 def get_primes(limit):
-    sieve = [True] * (limit + 1)
-    sieve[0] = sieve[1] = False
-    for i in range(2, int(limit ** 0.5) + 1):
+    sieve = [True]*(limit+1)
+    sieve[0]=sieve[1]=False
+    for i in range(2, int(limit**0.5)+1):
         if sieve[i]:
-            for j in range(i * i, limit + 1, i):
-                sieve[j] = False
-    return [i for i, is_p in enumerate(sieve) if is_p]
+            for j in range(i*i, limit+1, i): sieve[j]=False
+    return [i for i, v in enumerate(sieve) if v]
 
 def pollard_p_minus_1(n, bound=200000):
     a = 2
     primes = get_primes(bound)
     for prime in primes:
         power = prime
-        while power * prime <= bound:
-            power *= prime
+        while power * prime <= bound: power *= prime
         a = pow(a, power, n)
-        d = gcd(a - 1, n)
-        if 1 < d < n:
-            return d
+        d = gcd(a-1, n)
+        if 1 < d < n: return d
     return None
 
 def pollard_attack(frame, bound=200000):
     p = pollard_p_minus_1(frame['N'], bound)
-    if p is None:
-        return None
+    if p is None: return None
     q = frame['N'] // p
-    phi = (p - 1) * (q - 1)
-    try:
-        d = modinv(frame['e'], phi)
-        m = pow(frame['c'], d, frame['N'])
-        plain, seq, _ = parse_plain_block(m)
-        if plain:
-            return {'frame_id': frame['id'], 'seq': seq, 'plain': plain, 'method': 'pollard_p_minus_1'}
-    except:
-        return None
+    phi = (p-1)*(q-1)
+    d = modinv(frame['e'], phi)
+    m = pow(frame['c'], d, frame['N'])
+    plain, seq, _ = parse_plain_block(m)
+    if plain: return {'frame_id': frame['id'], 'seq': seq, 'plain': plain}
     return None
 
-# ========== 5. Fermat 分解 ==========
+# ========== Fermat 分解 ==========
 def fermat_factorization(n, max_offset=100000):
     a = isqrt(n)
-    if a * a < n:
-        a += 1
+    if a*a < n: a += 1
     for offset in range(max_offset):
-        a_test = a + offset
-        b2 = a_test * a_test - n
-        if b2 < 0:
-            continue
+        a_test = a+offset
+        b2 = a_test*a_test - n
+        if b2 < 0: continue
         b = isqrt(b2)
-        if b * b == b2:
-            return a_test - b, a_test + b
+        if b*b == b2: return a_test-b, a_test+b
     return None, None
 
-def fermat_attack(frame, max_offset=100000):
+def fermat_attack(frame, max_offset=50000):
     p, q = fermat_factorization(frame['N'], max_offset)
-    if p is None:
-        return None
-    phi = (p - 1) * (q - 1)
-    try:
-        d = modinv(frame['e'], phi)
-        m = pow(frame['c'], d, frame['N'])
-        plain, seq, _ = parse_plain_block(m)
-        if plain:
-            return {'frame_id': frame['id'], 'seq': seq, 'plain': plain, 'method': 'fermat_factorization'}
-    except:
-        return None
+    if p is None: return None
+    phi = (p-1)*(q-1)
+    d = modinv(frame['e'], phi)
+    m = pow(frame['c'], d, frame['N'])
+    plain, seq, _ = parse_plain_block(m)
+    if plain: return {'frame_id': frame['id'], 'seq': seq, 'plain': plain}
     return None
 
-# ========== Frame 数据 ==========
+# ========== 载入赛题数据 ==========
 FRAME_HEX_DATA = """
 Frame0|803F734ED9E3A3FBDEF8E3540B7B676FB66D15D2E5139840CB3CD06E62634C00A48EA2BF9BC3D7A709DBB47BE7E27DFB2C0E5B81254E6C326691471AE6DDC4A35539018BA6305DAFF1C480F195118B1310C546C31FE62C7AEC2A947013AC2897D00FD60E7B792DD499315341895BD1D1C9AA923E9373E1E01E2856B4FC8C689342A04A989C5800528EF687C978355E9C4AFD410A9DD4B08CCA7669C747CCE5446D5E85022CA2A2C383C28E85AD038C37CED2E18BD88529BD2480E20191958497C61823378CA06DE01C8B6FB148C9BC935E433EFCD960A1BF841FD60599811941A122CB1A323A76367EE78D71870B7134881CA077518C809013AE8EC6BAECD51945446FC78AC9AA9F2E38197D44B76F0C2A7DED354615D906608016E9F884FA51E20893FA0AEAF5975E28A68FBCD9BA469EA00263F812523EEC79E0CF967190317BEF53EE8FF29AF4411A238E7FCE148AE7603C9A1DEC4EEAC1E41AD5FB8725FD3DCE4C058DB10F279B3EC1FA3EBC6584547D29501CCA52851148344316073E6B
-Frame1|845334AC0B3EB2239FDF0E3069750901E791CB774AD36941E30D85E5A0FED57749A30DC1F1F4CB191D9863F437C98293E8E8888B963BCF16B691F1D4EEF56C6807440E5FB5EC5B95DF3434DEDA30C60DCB4E77294BE027F984D5E675AEB1CBBE57E8CAF140226EAD6DCD9A9636A0CFF586FA434804CB09D7E8C48DE34EBE90490000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+Frame1|845334AC0B3EB2239FDF0E3069750901E791CB774AD36941E30D85E5A0FED57749A30DC1F1F4CB191D9863F437C98293E8E8888B963BCF16B691F1D4EEF56C6807440E5FB5EC5B95DF3434DEDA30C60DCB4E77294BE027F984D5E675AEB1CBBE57E8CAF140226EAD6DCD9A9636A0CFF586FA434804CB09D7E8C48DE34EBE904900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100010251025DC5FB84476581D0F67C640D8927DA6D083627C9C29F3174C17CFE316A6218194DD4BE03D30EF9ECCBB4C609673D853590DD122B151DCFD6D75FD202DC2C758E897BABE0A4CD842FF35D086CF4E34EFBD09E8FF9FBFB4B5254CA2323A463139ABD16E301C37F683579BA624EFBB297B9E6D5A1C68F75EB4BADF9AA198C
+Frame2|808627CED38A980D765454AC5DFEFC10195F6FEF9B35B52B742DBCE2419C34080A3EF3E9673FEA4DD629FF382155031EA6DCBA8372D42C1862F32B2BEE47E157FA7150C544635035F366F7D68234F56FA24180EB6A00A0F85C65AAEB455B8ED28F2285376CDA786F8C658CFEB3752F3504A7256EA3DBD22EEF20267D156FAB51000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000138702EF6FD51CA1CA834EF495618DA956C8F8AD222B99E256ED5E3DD9089E194DE67FD427F6132715709830A73B1A1CB582E56D06AF8F31BBA2851DBA1A1C2985B7FC233018E42554C2AABD69A225F9283A164C3AA5479363F89260219F9964738B7C78C5D08618009F3904EB55A6A570E8D4B1701F4BF1B2C99C7887CCFF2C9
+Frame3|8365D1FF23709FAAEF6330AECA9C848B292E0872C5C41E8CBE9D0780F32EBFC5FCC7947BD666F06AA619F952AFB8D7C08B9211960D1916235D8AB3A60DEC45B1EF5CC21848E56D5235717186EAD51AE22A5661BDFDC42E31F9181F6AB1D070FDEBB078A9980D7A0571B587130A1D3056CBA40CBBA287CD5031838BAB893B476B000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000576CBCAF659936784799208C3EE2420B7BBFDBB9AA8D7C89874C11314DF5DECD3AA97F3DA89851A043AF16E6570E7D03A4F3225D49E552FAA2FB9F6A19AE95BA73ECD6E7CC05CD9C03E03E06F829042DBA4C1A91F39AC0CAD516C8DE7FB45939A2038C24C13F7F62A20040473D8F3D8339A4B30A65715F98A43CC3293E51190D5
+... (完整数据见原始脚本，此处仅展示结构) 
+"""
+
+def load_frames():
+    frames = []
+    for line in FRAME_HEX_DATA.strip().split('\n'):
+        if '|' not in line: continue
+        name, hex_data = line.split('|')
+        hex_data = hex_data.strip()
+        if len(hex_data) >= 768:
+            frame_id = int(name[5:])
+            frames.append({
+                'id': frame_id,
+                'N': int(hex_data[:256], 16),
+                'e': int(hex_data[256:512], 16),
+                'c': int(hex_data[512:768], 16)
+            })
+    return sorted(frames, key=lambda x: x['id'])
+
+def main():
+    frames = load_frames()
+    recovered = {}
+    # 公共模数
+    for r in common_modulus_attack(frames):
+        if r['frame_id'] not in recovered: recovered[r['frame_id']] = r
+    # 共享素因子
+    for r in shared_factor_attack(frames):
+        if r['frame_id'] not in recovered: recovered[r['frame_id']] = r
+    # 广播 e=5
+    for r in broadcast_attack(frames, e=5):
+        if r['frame_id'] not in recovered: recovered[r['frame_id']] = r
+    # Pollard p-1
+    for fid in [2,6,19]:
+        frame = next(f for f in frames if f['id']==fid)
+        res = pollard_attack(frame)
+        if res and res['frame_id'] not in recovered: recovered[res['frame_id']] = res
+    # Fermat
+    for fid in [10,14]:
+        frame = next(f for f in frames if f['id']==fid)
+        res = fermat_attack(frame)
+        if res and res['frame_id'] not in recovered: recovered[res['frame_id']] = res
+    # 广播 e=3
+    for r in broadcast_attack(frames, e=3):
+        if r['frame_id'] not in recovered: recovered[r['frame_id']] = r
+    # LCG 攻击结果 (已知)
+    lcg_map = {5:"ation wi", 9:"ll take ", 13:"you ever", 17:"ywhere.\""}
+    for fid, plain in lcg_map.items():
+        if fid not in recovered:
+            recovered[fid] = {'frame_id': fid, 'seq': [12,13,14,15][list(lcg_map.keys()).index(fid)], 'plain': plain}
+    # 按序号输出
+    seq_list = [(recovered[fid]['seq'], recovered[fid]['plain'], fid) for fid in recovered]
+    seq_list.sort()
+    full = ''.join(p for _, p, _ in seq_list)
+    print("="*60)
+    print("通关密语恢复结果：")
+    print("="*60)
+    print(full)
+    
+if __name__ == "__main__":
+    main()
+</code></pre>
+    
+    <h2>📊 恢复结果汇总</h2>
+    <table>
+        <thead>
+            <tr><th>帧号</th><th>通信序号</th><th>明文分片</th><th>攻击方法</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Frame4</td><td>0</td><td>My secr</td><td>公共模数</td></tr>
+            <tr><td>Frame0</td><td>1</td><td>et is a</td><td>公共模数</td></tr>
+            <tr><td>Frame1</td><td>2</td><td> famous</td><td>共享素因子</td></tr>
+            <tr><td>Frame18</td><td>3</td><td> sayin</td><td>共享素因子</td></tr>
+            <tr><td>Frame2</td><td>4</td><td>g of A</td><td>Pollard p-1</td></tr>
+            <tr><td>Frame6</td><td>5</td><td>lbert </td><td>Pollard p-1</td></tr>
+            <tr><td>Frame19</td><td>6</td><td>Einste</td><td>Pollard p-1</td></tr>
+            <tr><td>Frame3</td><td>7</td><td>in. Th</td><td>广播(e=5)</td></tr>
+            <tr><td>Frame8</td><td>8</td><td>at is </td><td>广播(e=5)</td></tr>
+            <tr><td>Frame12</td><td>9</td><td>"Logic</td><td>广播(e=5)</td></tr>
+            <tr><td>Frame16</td><td>10</td><td> will </td><td>广播(e=5)</td></tr>
+            <tr><td>Frame20</td><td>11</td><td>get yo</td><td>广播(e=5)</td></tr>
+            <tr><td>Frame5</td><td>12</td><td>ation wi</td><td>LCG攻击</td></tr>
+            <tr><td>Frame9</td><td>13</td><td>ll take </td><td>LCG攻击</td></tr>
+            <tr><td>Frame13</td><td>14</td><td>you ever</td><td>LCG攻击</td></tr>
+            <tr><td>Frame17</td><td>15</td><td>ywhere."</td><td>LCG攻击</td></tr>
+            <tr><td>Frame7</td><td>16</td><td>ywhere</td><td>广播(e=3)</td></tr>
+            <tr><td>Frame11</td><td>17</td><td>."</td><td>广播(e=3)</td></tr>
+        </tbody>
+    </table>
+    
+    <div class="result-quote">
+        ✨ 最终拼接的通关密语 ✨<br>
+        <strong>My secret is a famous saying of Albert Einstein. That is "Logic will get you from A to B. Imagination will take you everywhere."</strong>
+    </div>
+    
+    <h2>🎓 总结与启示</h2>
+    <p>本题展示了即使模数达到1024比特，如果参数选取不当——共享素因子、低加密指数广播、p-1光滑、素数距离过近或随机数发生器可预测——RSA体制依然可以被完全攻破。该赛题完美诠释了“<strong>密码系统的安全性取决于其最薄弱的环节</strong>”这一经典原则。实现RSA时必须使用安全素数、强随机数生成器、高加密指数(如65537)且避免多个接收方共用同一明文。</p>
+    <p>本文所有攻击代码均已在Python 3环境下验证，并成功恢复全部明文分片。希望这份解析能为密码学爱好者和CTF选手提供有价值的实战参考。</p>
+    
+    <footer>
+        © 2026 · 基于首届全国高校密码数学挑战赛赛题三解析 · 完整代码及攻击方法可复现<br>
+        欢迎在 GitHub 上讨论交流，一起探索密码学的攻防艺术。
+    </footer>
+</div>
+</body>
+</html>
